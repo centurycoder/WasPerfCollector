@@ -1,0 +1,145 @@
+import re
+import time
+import os
+
+def getJVMStats(CellNameList,NodeNameList,SrvrNameList,StatsObjs,outfile):
+    for CellName,NodeName,SrvrName,stats in zip(CellNameList,NodeNameList,SrvrNameList,StatsObjs):
+        try:
+            MinHeapSize = stats.getStats('jvmRuntimeModule').getStatistic('HeapSize').getLowerBound() / 1024
+            MaxHeapSize = stats.getStats('jvmRuntimeModule').getStatistic('HeapSize').getUpperBound() / 1024
+            CurHeapSize = stats.getStats('jvmRuntimeModule').getStatistic('HeapSize').getCurrent() / 1024
+            HeapSizeLow = stats.getStats('jvmRuntimeModule').getStatistic('HeapSize').getLowWaterMark() / 1024
+            HeapSizeHigh = stats.getStats('jvmRuntimeModule').getStatistic('HeapSize').getHighWaterMark() / 1024
+
+            UsedMemory = stats.getStats('jvmRuntimeModule').getStatistic('UsedMemory').getCount() / 1024
+            FreeMemory = stats.getStats('jvmRuntimeModule').getStatistic('FreeMemory').getCount() / 1024
+
+            UpTime = int(stats.getStats('jvmRuntimeModule').getStatistic('UpTime').getCount() / 3600)
+            CpuUsage = stats.getStats('jvmRuntimeModule').getStatistic('ProcessCpuUsage').getCount()
+
+            print >>outfile, time.strftime("%Y-%m-%d %H:%M:%S"), CellName, NodeName, SrvrName, MinHeapSize, MaxHeapSize, CurHeapSize, HeapSizeLow, HeapSizeHigh, UsedMemory, FreeMemory, UpTime, CpuUsage
+        except:
+            print "Ooops, something went wrong :("
+            raise
+
+def getTPStats(CellNameList,NodeNameList,SrvrNameList,StatsObjs,outfile):
+    for CellName,NodeName,SrvrName,stats in zip(CellNameList,NodeNameList,SrvrNameList,StatsObjs):
+        try:
+            MinPoolSize = stats.getStats('threadPoolModule').getStats('WebContainer').getStatistic('PoolSize').getLowerBound()
+            MaxPoolSize = stats.getStats('threadPoolModule').getStats('WebContainer').getStatistic('PoolSize').getUpperBound()
+            CurPoolSize = stats.getStats('threadPoolModule').getStats('WebContainer').getStatistic('PoolSize').getCurrent()
+            PoolSizeLow = stats.getStats('threadPoolModule').getStats('WebContainer').getStatistic('PoolSize').getLowWaterMark()
+            PoolSizeHigh = stats.getStats('threadPoolModule').getStats('WebContainer').getStatistic('PoolSize').getHighWaterMark()
+
+            ActiveCount = stats.getStats('threadPoolModule').getStats('WebContainer').getStatistic('ActiveCount').getCurrent()
+            ActiveCountLow = stats.getStats('threadPoolModule').getStats('WebContainer').getStatistic('ActiveCount').getLowWaterMark()
+            ActiveCountHigh = stats.getStats('threadPoolModule').getStats('WebContainer').getStatistic('ActiveCount').getHighWaterMark()
+
+            print >>outfile, time.strftime("%Y-%m-%d %H:%M:%S"), CellName, NodeName, SrvrName, MinPoolSize, MaxPoolSize, CurPoolSize, PoolSizeLow, PoolSizeHigh, ActiveCount, ActiveCountLow, ActiveCountHigh
+        except:
+            print "Ooops, something went wrong :("
+            raise
+
+def getCPStats(CellNameList,NodeNameList,SrvrNameList,StatsObjs,outfile):
+    for CellName,NodeName,SrvrName,stats in zip(CellNameList,NodeNameList,SrvrNameList,StatsObjs):
+        try:
+            for driver in stats.getStats('connectionPoolModule').subCollections():
+                for ds in stats.getStats('connectionPoolModule').getStats(driver.getName()).subCollections():
+                    DSName = ds.getName()
+                    if re.search("/Default", DSName):
+                        continue
+                    MinPoolSize = ds.getStatistic('PoolSize').getLowerBound()
+                    MaxPoolSize = ds.getStatistic('PoolSize').getUpperBound()
+                    CurPoolSize = ds.getStatistic('PoolSize').getCurrent()
+                    PoolSizeLow = ds.getStatistic('PoolSize').getLowWaterMark()
+                    PoolSizeHigh = ds.getStatistic('PoolSize').getHighWaterMark()
+
+                    CurFreePoolSize = ds.getStatistic('FreePoolSize').getCurrent()
+                    FreePoolSizeLow = ds.getStatistic('FreePoolSize').getLowWaterMark()
+                    FreePoolSizeHigh = ds.getStatistic('FreePoolSize').getHighWaterMark()
+
+                    CurWaitThread = ds.getStatistic('WaitingThreadCount').getCurrent()
+                    WaitThreadLow = ds.getStatistic('WaitingThreadCount').getLowWaterMark()
+                    WaitThreadHigh = ds.getStatistic('WaitingThreadCount').getHighWaterMark()
+
+                    CurPercentUsed = ds.getStatistic('PercentUsed').getCurrent()
+                    PercentUsedLow = ds.getStatistic('PercentUsed').getLowWaterMark()
+                    PercentUsedHigh = ds.getStatistic('PercentUsed').getHighWaterMark()
+
+                    #print ds.getStatistic('UseTime').getClass().getMethods()
+
+                    ConnUseTimeAvg = round(ds.getStatistic('UseTime').getMean()/60, 2)
+                    ConnUseTimeMin = round(ds.getStatistic('UseTime').getMin()/60, 2)
+                    ConnUseTimeMax = round(ds.getStatistic('UseTime').getMax()/60, 2)
+                    
+                    ConnWaitTimeAvg = round(ds.getStatistic('WaitTime').getMean()/60, 2)
+                    ConnWaitTimeMin = round(ds.getStatistic('WaitTime').getMin()/60, 2)
+                    ConnWaitTimeMax = round(ds.getStatistic('WaitTime').getMax()/60, 2)
+                    
+                    print >>outfile, time.strftime("%Y-%m-%d %H:%M:%S"), CellName, NodeName, SrvrName, DSName, MinPoolSize,MaxPoolSize ,CurPoolSize ,PoolSizeLow ,PoolSizeHigh ,CurFreePoolSize ,FreePoolSizeLow ,FreePoolSizeHigh ,CurWaitThread ,WaitThreadLow ,WaitThreadHigh ,CurPercentUsed ,PercentUsedLow ,PercentUsedHigh ,ConnUseTimeAvg ,ConnUseTimeMin ,ConnUseTimeMax ,ConnWaitTimeAvg ,ConnWaitTimeMin ,ConnWaitTimeMax
+        except:
+            print "Ooops, something went wrong :("
+            raise
+
+if __name__ == '__main__':
+    interval = int(sys.argv[0])
+    SrvrNameList = []
+    NodeNameList = []
+    CellNameList = []
+    PerfStrList = []
+    SrvrStrList=AdminControl.queryNames( 'type=Server,processType=ManagedProcess,*').split('\n')
+
+    SrvrObjs= []
+    PerfObjs = []
+    StatsObjs = []
+
+    for SrvrStr in SrvrStrList:
+        CellName=re.findall(r"cell=(\w+)",SrvrStr)[0]
+        CellNameList.append(CellName)
+        NodeName=re.findall(r"node=(\w+)",SrvrStr)[0]
+        NodeNameList.append(NodeName)
+        SrvrName=re.findall(r"name=(\w+)",SrvrStr)[0]
+        SrvrNameList.append(SrvrName)
+        PerfStr = AdminControl.queryNames( 'type=Perf,process=' + SrvrName +',*')
+        PerfStrList.append(PerfStr)
+
+        perfObj = AdminControl.makeObjectName(PerfStr)
+        PerfObjs.append(perfObj)
+        srvrObj = AdminControl.makeObjectName(SrvrStr)
+        SrvrObjs.append(srvrObj)
+        statsObj = AdminControl.invoke_jmx(perfObj, 'getStatsObject', [srvrObj, java.lang.Boolean('true')], ['javax.management.ObjectName', 'java.lang.Boolean'])
+        StatsObjs.append(statsObj)
+        
+
+    oldday = time.strftime("%Y-%m-%d")
+    jvmname = "output/jvm_" + oldday + ".csv"
+    tpname = "output/threadpool_" + oldday + ".csv"
+    cpname = "output/connpool_" + oldday + ".csv"
+
+    jvmfile = open (jvmname,'a')
+    tpfile = open (tpname,'a')
+    cpfile = open(cpname,'a')
+
+    while 1:
+        newday = time.strftime("%Y-%m-%d")
+        if oldday != newday:
+            jvmfile.close()
+            tpfile.close()
+            cpfile.close()
+            
+            jvmname = "output/jvm_" + newday + ".csv"
+            tpname = "output/threadpool_" + newday + ".csv"
+            cpname = "output/connpool_" + newday + ".csv"
+
+            jvmfile = open (jvmname,'a')
+            tpfile = open (tpname,'a')
+            cpfile = open(cpname,'a')
+
+            olday = newday
+
+        getJVMStats(CellNameList,NodeNameList,SrvrNameList,StatsObjs,jvmfile)
+        getTPStats(CellNameList,NodeNameList,SrvrNameList,StatsObjs,tpfile)
+        getCPStats(CellNameList,NodeNameList,SrvrNameList,StatsObjs,cpfile)
+    
+        sleep(interval)
+    
